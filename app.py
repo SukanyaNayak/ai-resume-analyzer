@@ -1,40 +1,36 @@
 from dotenv import load_dotenv
 import streamlit as st
-import PyPDF2
-from docx import Document
-import plotly.express as px
-import pandas as pd
-import time
-from google import genai
 import os
-import logging
 import json
-from huggingface_hub import login
-login(token=os.getenv("HF_TOKEN"))
-load_dotenv()
-os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
-
-logging.getLogger("transformers").setLevel(logging.ERROR)
-
-# Get API key from .env
-api_key = os.getenv("GEMINI_API_KEY")
-
-# Configure Gemini
-genai.configure(api_key=api_key)
+import logging
+import joblib
+import pandas as pd
+import plotly.express as px
+from docx import Document
+import PyPDF2
+from google import genai
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+
+load_dotenv()
+
+os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+logging.getLogger("transformers").setLevel(logging.ERROR)
+
+# Get API key (Streamlit Cloud secrets OR .env)
+api_key = st.secrets.get("GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY")
+
+# ✅ New google-genai SDK style
+client = genai.Client(api_key=api_key)
+
 @st.cache_resource
-def load_sentence_model():
-    return SentenceTransformer('all-MiniLM-L6-v2')
+def load_models():
+    nlp = SentenceTransformer('all-MiniLM-L6-v2')
+    ml_model = joblib.load("logistic_model.pkl")
+    scaler = joblib.load("scaler.pkl")
+    return nlp, ml_model, scaler
 
-model_nlp = load_sentence_model()
-
-import joblib
-
-ML_model = joblib.load("logistic_model.pkl")
-gemini_model = genai.GenerativeModel("models/gemini-2.5-flash")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-scaler = joblib.load("scaler.pkl")
+model_nlp, ML_model, scaler = load_models()
 
 def extract_skills_ai(job_description, resume_text):
 
@@ -55,11 +51,11 @@ def extract_skills_ai(job_description, resume_text):
     Resume:
     {resume_text[:2500]}
     """
-
-    response = gemini_model.generate_content(
-        prompt,
-        generation_config={"response_mime_type": "application/json"}
-    )
+    response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=prompt,
+    config={"response_mime_type": "application/json"}
+    )   
 
     return json.loads(response.text).get("matched_skills", []), \
            json.loads(response.text).get("missing_skills", [])
@@ -316,11 +312,10 @@ def get_role_skills(job_role):
     }}
     """
 
-    response = gemini_model.generate_content(
-        prompt,
-        generation_config={
-            "response_mime_type": "application/json"
-        }
+    response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=prompt,
+    config={"response_mime_type": "application/json"}
     )
 
     raw_text = response.text.strip()
