@@ -9,12 +9,7 @@ import google.generativeai as genai
 import os
 import logging
 import json
-from huggingface_hub import login
-
 load_dotenv()
-
-login(token=os.getenv("HF_TOKEN"))
-
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
@@ -27,9 +22,11 @@ api_key = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=api_key)
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-model_nlp = SentenceTransformer(
-    'all-MiniLM-L6-v2'
-)
+@st.cache_resource
+def load_sentence_model():
+    return SentenceTransformer('all-MiniLM-L6-v2')
+
+model_nlp = load_sentence_model()
 
 import joblib
 
@@ -537,8 +534,6 @@ if uploaded_file is not None and submit_button:
     else:
 
         with st.spinner("Analyzing Resume..."):
-
-            time.sleep(2)
 
             file_type = uploaded_file.name.split(".")[-1]
 
