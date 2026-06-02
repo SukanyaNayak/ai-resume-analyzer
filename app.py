@@ -13,7 +13,6 @@ load_dotenv()
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
-load_dotenv()
 
 # Get API key from .env
 api_key = os.getenv("GEMINI_API_KEY")
@@ -37,82 +36,31 @@ scaler = joblib.load("scaler.pkl")
 
 def extract_skills_ai(job_description, resume_text):
 
-    # =====================================================
-    # CASE 1 → ONLY ROLE NAME
-    # =====================================================
+    prompt = f"""
+    You are an ATS system.
 
-    if len(job_description.split()) <= 3:
+    Extract matched and missing skills.
 
-        required_skills = get_role_skills(job_description)
+    Return ONLY JSON:
+    {{
+        "matched_skills": [],
+        "missing_skills": []
+    }}
 
-        prompt = f"""
-        Compare these required skills with the resume.
+    Job:
+    {job_description}
 
-        Return ONLY valid JSON.
-
-        {{
-            "matched_skills": [],
-            "missing_skills": []
-        }}
-
-        Required Skills:
-        {required_skills}
-
-        Resume:
-        {resume_text}
-        """
-
-    # =====================================================
-    # CASE 2 → FULL JOB DESCRIPTION
-    # =====================================================
-
-    else:
-
-        prompt = f"""
-        Compare the resume and job description.
-
-        Return ONLY valid JSON.
-
-        {{
-            "matched_skills": [],
-            "missing_skills": []
-        }}
-
-        Job Description:
-        {job_description}
-
-        Resume:
-        {resume_text}
-        """
-
-    # =====================================================
-    # GEMINI RESPONSE
-    # =====================================================
+    Resume:
+    {resume_text[:2500]}
+    """
 
     response = gemini_model.generate_content(
         prompt,
-        generation_config={
-            "response_mime_type": "application/json"
-        }
+        generation_config={"response_mime_type": "application/json"}
     )
 
-    raw_text = response.text.strip()
-
-    try:
-
-        result = json.loads(raw_text)
-
-        matched_skills = result.get("matched_skills", [])
-        missing_skills = result.get("missing_skills", [])
-
-        return matched_skills, missing_skills
-
-    except json.JSONDecodeError:
-
-        st.error("Invalid JSON received")
-        st.write(raw_text)
-
-        return [], []
+    return json.loads(response.text).get("matched_skills", []), \
+           json.loads(response.text).get("missing_skills", [])
 # =====================================================
 # PAGE CONFIG
 # =====================================================
