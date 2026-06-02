@@ -5,10 +5,12 @@ from docx import Document
 import plotly.express as px
 import pandas as pd
 import time
-import google.generativeai as genai
+from google import genai
 import os
 import logging
 import json
+from huggingface_hub import login
+login(token=os.getenv("HF_TOKEN"))
 load_dotenv()
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 
